@@ -1,0 +1,11 @@
+{
+    "name": "CaroTS",
+    "plugin": ["typedoc-plugin-markdown", "typedoc-docusaurus-theme"],
+    "entryPoints": ["lib/index.ts"],
+    "out": "../devotion/website/docs/carots/api",
+    "sidebar": {
+        "pretty": true,
+        "typescript": true
+    },
+    "entryPointStrategy": "expand"
+}

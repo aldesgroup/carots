@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "baseUrl": "./",
+        "paths": {
+            "~/*": ["./lib/*"]
+        },
+        "typeRoots": ["env.d.ts", "./node_modules/@types"],
+        "lib": ["ES2024"]
+    }
+}
