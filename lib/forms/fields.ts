@@ -1,6 +1,14 @@
-import {fieldAtom, formAtom, FormAtom, useFieldValue as getValue, RESET, useForm, useInputField, type FieldAtom} from 'form-atoms';
-import {atom, Atom, useAtom, useSetAtom, useStore, WritableAtom} from 'jotai';
-import {useCallback, useMemo} from 'react';
+import type { FieldAtom, FormAtom, RESET } from 'form-atoms';
+import {
+	fieldAtom,
+	formAtom,
+	useFieldValue as getValue,
+	useFieldActions,
+	useForm,
+} from 'form-atoms';
+import type { Atom, WritableAtom } from 'jotai';
+import { atom, useAtom, useSetAtom, useStore } from 'jotai';
+import { useCallback, useMemo } from 'react';
 
 // ------------------------------------------------------------------------------------------------
 // Base structure for defining a model
@@ -13,10 +21,10 @@ import {useCallback, useMemo} from 'react';
  * @property {FieldMetaAtom[]} states - Array of all FieldMetaAtom from the fields
  */
 export type Model<T extends Record<string, Field<any>>> = T & {
-    _URL: string;
-    _fields: T;
-    _form: FormAtom<{[K in keyof T]: FieldAtom<any>}>;
-    _states: FieldMetaAtom<any>[];
+	_URL: string;
+	_fields: T;
+	_form: FormAtom<{ [K in keyof T]: FieldAtom<any> }>;
+	_states: FieldMetaAtom<any>[];
 };
 
 /**
@@ -25,19 +33,24 @@ export type Model<T extends Record<string, Field<any>>> = T & {
  * @returns {Model<T>} Complete model with fields, form, and states
  * @category Forms Utils
  */
-export function newModel<T extends Record<string, Field<any>>>(url: string, fields: T): Model<T> {
-    const fieldsMap = Object.entries(fields).reduce<Record<string, FieldAtom<any>>>((acc, [key, field]) => {
-        acc[key] = field.valueAtom;
-        return acc;
-    }, {});
+export function newModel<T extends Record<string, Field<any>>>(
+	url: string,
+	fields: T,
+): Model<T> {
+	const fieldsMap = Object.entries(fields).reduce<
+		Record<string, FieldAtom<any>>
+	>((acc, [key, field]) => {
+		acc[key] = field.valueAtom;
+		return acc;
+	}, {});
 
-    return {
-        ...fields, // this provides a direct access to each field, without writing "._fields" in between
-        _URL: url,
-        _fields: fields,
-        _form: formAtom(fieldsMap) as FormAtom<{[K in keyof T]: FieldAtom<any>}>,
-        _states: Object.values(fields).map(field => field.stateAtom),
-    };
+	return {
+		...fields, // this provides a direct access to each field, without writing "._fields" in between
+		_URL: url,
+		_fields: fields,
+		_form: formAtom(fieldsMap) as FormAtom<{ [K in keyof T]: FieldAtom<any> }>,
+		_states: Object.values(fields).map((field) => field.stateAtom),
+	};
 }
 
 /**
@@ -48,9 +61,9 @@ export function newModel<T extends Record<string, Field<any>>>(url: string, fiel
  * @category Forms Utils
  */
 export type fieldState<Value> = {
-    name: string;
-    valueAtom: FieldAtom<Value>;
-    stateAtom: FieldMetaAtom<Value>;
+	name: string;
+	valueAtom: FieldAtom<Value>;
+	stateAtom: FieldMetaAtom<Value>;
 };
 
 /**
@@ -73,20 +86,20 @@ export type fieldState<Value> = {
  * @category Forms Utils
  */
 export type fieldSpecs<Value> = {
-    initialValue: Value;
-    visible?: () => boolean;
-    disabled?: () => boolean;
-    effects?: (() => void)[];
-    min?: number | undefined;
-    max?: number | undefined;
-    step?: number | undefined;
-    decrementDisabled?: () => boolean;
-    incrementDisabled?: () => boolean;
-    options?: FieldOption[];
-    optionsOnly?: number[];
-    optionsInfos?: Map<number, FieldOptionInfos>;
-    mandatory?: boolean | (() => boolean);
-    valid?: () => null | FieldValueError;
+	initialValue: Value;
+	visible?: () => boolean;
+	disabled?: () => boolean;
+	effects?: (() => void)[];
+	min?: number | undefined;
+	max?: number | undefined;
+	step?: number | undefined;
+	decrementDisabled?: () => boolean;
+	incrementDisabled?: () => boolean;
+	options?: FieldOption[];
+	optionsOnly?: number[];
+	optionsInfos?: Map<number, FieldOptionInfos>;
+	mandatory?: boolean | (() => boolean);
+	valid?: () => null | FieldValueError;
 };
 
 /**
@@ -101,13 +114,16 @@ export type Field<Value> = fieldState<Value> & fieldSpecs<Value>;
  * @returns {Field<Value>} Field composed of BaseField; extras can be merged by the caller.
  * @category Forms Utils
  */
-export function newField<Value>(name: string, specs: fieldSpecs<Value>): Field<Value> {
-    return {
-        name: name,
-        valueAtom: fieldAtom({value: specs.initialValue}),
-        stateAtom: stateAtom(),
-        ...specs,
-    };
+export function newField<Value>(
+	name: string,
+	specs: fieldSpecs<Value>,
+): Field<Value> {
+	return {
+		name: name,
+		valueAtom: fieldAtom({ value: specs.initialValue }),
+		stateAtom: stateAtom(),
+		...specs,
+	};
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -121,8 +137,8 @@ export function newField<Value>(name: string, specs: fieldSpecs<Value>): Field<V
  * @category Forms Utils
  */
 export function useFieldValue<Value>(field: Field<Value>) {
-    const fieldValue = getValue(field.valueAtom);
-    return fieldValue;
+	const fieldValue = getValue(field.valueAtom);
+	return fieldValue;
 }
 
 /**
@@ -132,20 +148,19 @@ export function useFieldValue<Value>(field: Field<Value>) {
  * @category Forms Utils
  */
 export function useSetField<Value>(field: Field<Value>) {
-    // TODO : patch request to push the data into the cloud?
-    const inputField = useInputField(field.valueAtom);
-    const setState = useSetAtom(field.stateAtom);
+	const actions = useFieldActions(field.valueAtom);
+	const setState = useSetAtom(field.stateAtom);
 
-    // this way we always set the date the value was modified
-    const setValue = (value: typeof RESET | Value | ((prev: Value) => Value)) => {
-        inputField.actions.setValue(value);
-        setState((prev: FieldMeta<Value>) => ({
-            ...prev,
-            lastModified: new Date(),
-        }));
-    };
+	// this way we always set the date the value was modified
+	const setValue = useCallback(
+		(value: typeof RESET | Value | ((prev: Value) => Value)) => {
+			actions.setValue(value);
+			setState((prev) => ({ ...prev, lastModified: new Date() }));
+		},
+		[actions, setState],
+	);
 
-    return setValue;
+	return setValue;
 }
 
 /**
@@ -154,10 +169,12 @@ export function useSetField<Value>(field: Field<Value>) {
  * @returns {[Value, Function]} A tuple containing the value and a function to set the value.
  * @category Forms Utils
  */
-export function useField<Value>(field: Field<Value>): [Value, (value: typeof RESET | Value | ((prev: Value) => Value)) => void] {
-    const value = useFieldValue(field);
-    const setValue = useSetField(field);
-    return [value, setValue];
+export function useField<Value>(
+	field: Field<Value>,
+): [Value, (value: typeof RESET | Value | ((prev: Value) => Value)) => void] {
+	const value = useFieldValue(field);
+	const setValue = useSetField(field);
+	return [value, setValue];
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -171,24 +188,28 @@ export function useField<Value>(field: Field<Value>): [Value, (value: typeof RES
  * @category Forms Utils
  */
 export type FieldMeta<Value> = {
-    lastModified: Date | null; // the last time the user changed the value
-    lastSyncedVal: Value | null; // the value retrieved from the aforementioned external system
+	lastModified: Date | null; // the last time the user changed the value
+	lastSyncedVal: Value | null; // the value retrieved from the aforementioned external system
 };
 
 /**
  * Type for the atoms that we use to conceal additional properties associated with a field
  * @category Forms Utils
  */
-export type FieldMetaAtom<Value> = WritableAtom<FieldMeta<Value>, [FieldMeta<Value> | ((prev: FieldMeta<Value>) => FieldMeta<Value>)], void>;
+export type FieldMetaAtom<Value> = WritableAtom<
+	FieldMeta<Value>,
+	[FieldMeta<Value> | ((prev: FieldMeta<Value>) => FieldMeta<Value>)],
+	void
+>;
 
 /**
  * Creates a field state atom, to associated with a field atom inside a field
  */
 export function stateAtom<Value>(): FieldMetaAtom<Value> {
-    return atom<FieldMeta<Value>>({
-        lastModified: null,
-        lastSyncedVal: null,
-    });
+	return atom<FieldMeta<Value>>({
+		lastModified: null,
+		lastSyncedVal: null,
+	});
 }
 
 /**
@@ -198,15 +219,17 @@ export function stateAtom<Value>(): FieldMetaAtom<Value> {
  * @category Forms Utils
  */
 // TODO automatically call it when setting the value of a field?!?
-export function useFieldMeta<Value>(field: Field<Value>): [FieldMeta<Value>, (syncedVal: Value) => void] {
-    const [state, setState] = useAtom(field.stateAtom);
-    const setSyncedVal = (syncedVal: Value) => {
-        setState(prev => ({
-            ...prev,
-            lastSyncedVal: syncedVal,
-        }));
-    };
-    return [state, setSyncedVal];
+export function useFieldMeta<Value>(
+	field: Field<Value>,
+): [FieldMeta<Value>, (syncedVal: Value) => void] {
+	const [state, setState] = useAtom(field.stateAtom);
+	const setSyncedVal = (syncedVal: Value) => {
+		setState((prev) => ({
+			...prev,
+			lastSyncedVal: syncedVal,
+		}));
+	};
+	return [state, setSyncedVal];
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -219,7 +242,7 @@ export function useFieldMeta<Value>(field: Field<Value>): [FieldMeta<Value>, (sy
  * @property {string} label - The label of the option.
  * @category Forms Utils
  */
-export type FieldOption = {value: number; label: string};
+export type FieldOption = { value: number; label: string };
 
 /**
  * Type definition for additional information about a field option.
@@ -227,7 +250,7 @@ export type FieldOption = {value: number; label: string};
  * @property {LucideIcon} [icon] - An icon associated with the option.
  * @category Forms Utils
  */
-export type FieldOptionInfos = {disabled?: Atom<boolean>};
+export type FieldOptionInfos = { disabled?: Atom<boolean> };
 
 // ------------------------------------------------------------------------------------------------
 // Field value error
@@ -239,7 +262,7 @@ export type FieldOptionInfos = {disabled?: Atom<boolean>};
  * @property {any} [param] - Additional parameters for the error.
  * @category Forms Utils
  */
-export type FieldValueError = {msg: string; param?: any};
+export type FieldValueError = { msg: string; param?: any };
 
 /**
  * Hook to check if a particular field is valid, using the field's configured 'valid' custom hook,
@@ -249,68 +272,78 @@ export type FieldValueError = {msg: string; param?: any};
  * @category Forms Utils
  */
 export function useFieldValidationError<Value>(field: Field<Value>) {
-    const validError = field.valid && field.valid();
-    const value = getValue(field.valueAtom) as Value;
-    const mandatory = field.mandatory && (typeof field.mandatory === 'function' ? field.mandatory() : field.mandatory);
+	const validError = field.valid?.();
+	const value = getValue(field.valueAtom) as Value;
+	const mandatory =
+		field.mandatory &&
+		(typeof field.mandatory === 'function'
+			? field.mandatory()
+			: field.mandatory);
 
-    // checking the custom validation hook first (if there's one), since the computation's been done anyway!
-    if (validError) {
-        return validError;
-    }
+	// checking the custom validation hook first (if there's one), since the computation's been done anyway!
+	if (validError) {
+		return validError;
+	}
 
-    if (typeof value === 'number') {
-        if (field.options) {
-            // special case of enums
-            const options = field.optionsOnly ? field.optionsOnly : field.options.map(option => option.value);
-            if (value) {
-                if (!options.some(val => val === value)) {
-                    return {msg: 'This value is not allowed', param: field.min || 0};
-                }
-            } else if (mandatory) {
-                return {msg: 'A value must be provided here'};
-            }
-        } else {
-            if (typeof field.min === 'number' && value < field.min) {
-                return {msg: 'Must be greater than or equal to', param: field.min};
-            }
-            if (typeof field.max === 'number' && value > field.max) {
-                return {msg: 'Must be less than or equal to', param: field.max};
-            }
-            if (mandatory && !value && value !== 0) {
-                return {msg: 'A value must be provided here'};
-            }
-        }
-    } else if (typeof value === 'string') {
-        const min = field.min || 0;
-        const max = field.max || 0;
-        if (min > 0 && value.length > 0 && value.length < min) {
-            return {msg: 'Minimum required length not reached', param: min};
-        }
-        if (max > 0 && value.length > 0 && value.length > max) {
-            return {msg: 'Maximum required length exceeded', param: max};
-        }
-        if (mandatory && value.length === 0) {
-            return {msg: 'A value must be provided here'};
-        }
-    } else {
-        if (mandatory && !value) {
-            return {msg: 'A value must be provided here'};
-        }
-    }
+	if (typeof value === 'number') {
+		if (field.options) {
+			// special case of enums
+			const options = field.optionsOnly
+				? field.optionsOnly
+				: field.options.map((option) => option.value);
+			if (value) {
+				if (!options.some((val) => val === value)) {
+					return { msg: 'This value is not allowed', param: field.min || 0 };
+				}
+			} else if (mandatory) {
+				return { msg: 'A value must be provided here' };
+			}
+		} else {
+			if (typeof field.min === 'number' && value < field.min) {
+				return { msg: 'Must be greater than or equal to', param: field.min };
+			}
+			if (typeof field.max === 'number' && value > field.max) {
+				return { msg: 'Must be less than or equal to', param: field.max };
+			}
+			if (mandatory && !value && value !== 0) {
+				return { msg: 'A value must be provided here' };
+			}
+		}
+	} else if (typeof value === 'string') {
+		const min = field.min || 0;
+		const max = field.max || 0;
+		if (min > 0 && value.length > 0 && value.length < min) {
+			return { msg: 'Minimum required length not reached', param: min };
+		}
+		if (max > 0 && value.length > 0 && value.length > max) {
+			return { msg: 'Maximum required length exceeded', param: max };
+		}
+		if (mandatory && value.length === 0) {
+			return { msg: 'A value must be provided here' };
+		}
+	} else {
+		if (mandatory && !value) {
+			return { msg: 'A value must be provided here' };
+		}
+	}
 
-    return null;
+	return null;
 }
 
 /**
  * Hook that returns the first validation error found across the given model's fields.
  * Returns null if no error.
  */
-export function useModelValidationError<T extends Record<string, Field<any>>>(model: Model<T>) {
-    const fieldErrors = Object.values(model._fields).map(field => useFieldValidationError(field));
+export function useModelValidationError<T extends Record<string, Field<any>>>(
+	model: Model<T>,
+) {
+	const fieldErrors = Object.values(model._fields).map((field) =>
+		useFieldValidationError(field),
+	);
 
-    return useMemo(() => {
-        return fieldErrors.find(err => err !== null) || null;
-    }, [fieldErrors]);
+	return useMemo(() => {
+		return fieldErrors.find((err) => err !== null) || null;
+	}, [fieldErrors]);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -322,9 +355,9 @@ export function useModelValidationError<T extends Record<string, Field<any>>>(mo
  * @category Forms Utils
  */
 export type fieldDisplayMode =
-    | 'input' // when a field is displayed in a way that allows to modify its value
-    | 'sheet' // when a field is displayed as read-only in a sheet
-    | 'report'; //  when a field is displayed as read-only in a report
+	| 'input' // when a field is displayed in a way that allows to modify its value
+	| 'sheet' // when a field is displayed as read-only in a sheet
+	| 'report'; //  when a field is displayed as read-only in a report
 
 /**
  * Hook to check that a predicate function returns true for at least 1 form field of the given list.
@@ -333,12 +366,15 @@ export type fieldDisplayMode =
  * @returns {boolean} True if the predicate returns true for at least one field.
  * @category Forms Utils
  */
-export function useCheckSomeFormFieldValue<Value>(fields: Field<Value>[], predicate: (value: Value) => boolean): boolean {
-    const atomValues = fields.map(field => useFieldValue(field));
+export function useCheckSomeFormFieldValue<Value>(
+	fields: Field<Value>[],
+	predicate: (value: Value) => boolean,
+): boolean {
+	const atomValues = fields.map((field) => useFieldValue(field));
 
-    return useMemo(() => {
-        return atomValues.some(predicate);
-    }, [atomValues, predicate]);
+	return useMemo(() => {
+		return atomValues.some(predicate);
+	}, [atomValues, predicate]);
 }
 
 /**
@@ -348,12 +384,15 @@ export function useCheckSomeFormFieldValue<Value>(fields: Field<Value>[], predic
  * @returns {boolean} True if the predicate returns true for all fields.
  * @category Forms Utils
  */
-export function useCheckAllFormFieldValues<Value>(fields: Field<Value>[], predicate: (value: Value) => boolean): boolean {
-    const atomValues = fields.map(field => useFieldValue(field));
+export function useCheckAllFormFieldValues<Value>(
+	fields: Field<Value>[],
+	predicate: (value: Value) => boolean,
+): boolean {
+	const atomValues = fields.map((field) => useFieldValue(field));
 
-    return useMemo(() => {
-        return atomValues.every(predicate);
-    }, [atomValues, predicate]);
+	return useMemo(() => {
+		return atomValues.every(predicate);
+	}, [atomValues, predicate]);
 }
 
 /**
@@ -363,7 +402,7 @@ export function useCheckAllFormFieldValues<Value>(fields: Field<Value>[], predic
  * @category Forms Utils
  */
 export function useAllFormFieldsValues<Value>(fields: Field<Value>[]) {
-    return fields.map(field => useFieldValue(field));
+	return fields.map((field) => useFieldValue(field));
 }
 
 /**
@@ -372,8 +411,10 @@ export function useAllFormFieldsValues<Value>(fields: Field<Value>[]) {
  * @returns {Array<(value: typeof RESET | Value | ((prev: Value) => Value)) => void>} An array of setter functions.
  * @category Forms Utils
  */
-export function useAllFormFieldsSetters<Value>(fields: Field<Value>[]): Array<(value: typeof RESET | Value | ((prev: Value) => Value)) => void> {
-    return fields.map(field => useSetField(field));
+export function useAllFormFieldsSetters<Value>(
+	fields: Field<Value>[],
+): Array<(value: typeof RESET | Value | ((prev: Value) => Value)) => void> {
+	return fields.map((field) => useSetField(field));
 }
 
 /**
@@ -383,18 +424,18 @@ export function useAllFormFieldsSetters<Value>(fields: Field<Value>[]): Array<(v
  * @category Forms Utils
  */
 export function useSetAllFormFields<Value>(fields: Field<Value>[]) {
-    const valueSetters = fields.map(field => useSetField(field));
+	const valueSetters = fields.map((field) => useSetField(field));
 
-    const setAllValues = useCallback(
-        (newValue: typeof RESET | Value | ((prev: Value) => Value)) => {
-            valueSetters.forEach(setValue => {
-                setValue(newValue as any);
-            });
-        },
-        [valueSetters],
-    );
+	const setAllValues = useCallback(
+		(newValue: typeof RESET | Value | ((prev: Value) => Value)) => {
+			valueSetters.forEach((setValue) => {
+				setValue(newValue as any);
+			});
+		},
+		[valueSetters],
+	);
 
-    return setAllValues;
+	return setAllValues;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -413,15 +454,21 @@ export const emptyForm = formAtom({});
  * @returns {void}
  * @category Forms Utils
  */
-export function useResetModel<T extends Record<string, Field<any>>>(model: Model<T> | null) {
-    const form = useForm(model?._form ?? (emptyForm as FormAtom<any>));
-    const store = useStore();
+export function useResetModel<T extends Record<string, Field<any>>>(
+	model: Model<T> | null,
+) {
+	const form = useForm(model?._form ?? (emptyForm as FormAtom<any>));
+	const store = useStore();
 
-    return useCallback(() => {
-        if (!model) return;
-        form.reset();
-        model._states.forEach(stateAtom => {
-            store.set(stateAtom, (prev: FieldMeta<any>) => ({...prev, lastModified: null, lastSyncedVal: null}));
-        });
-    }, [form, store, model]);
+	return useCallback(() => {
+		if (!model) return;
+		form.reset();
+		model._states.forEach((stateAtom) => {
+			store.set(stateAtom, (prev: FieldMeta<any>) => ({
+				...prev,
+				lastModified: null,
+				lastSyncedVal: null,
+			}));
+		});
+	}, [form, store, model]);
 }
